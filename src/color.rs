@@ -1,0 +1,20 @@
+use ratatui::prelude::Color;
+
+pub const BG: Color = Color::Rgb(13, 17, 23);
+pub const SURFACE: Color = Color::Rgb(22, 27, 34);
+pub const SURFACE_BRIGHT: Color = Color::Rgb(33, 38, 45);
+pub const BORDER: Color = Color::Rgb(48, 54, 61);
+pub const BORDER_HIGHLIGHT: Color = Color::Rgb(88, 166, 255);
+pub const TEXT: Color = Color::Rgb(230, 237, 243);
+pub const TEXT_DIM: Color = Color::Rgb(125, 133, 144);
+pub const ACCENT: Color = Color::Rgb(88, 166, 255);
+pub const GREEN: Color = Color::Rgb(63, 185, 80);
+pub const YELLOW: Color = Color::Rgb(210, 153, 34);
+pub const PURPLE: Color = Color::Rgb(163, 113, 247);
+pub const CYAN: Color = Color::Rgb(57, 211, 211);
+pub const ORANGE: Color = Color::Rgb(219, 109, 40);
+pub const PINK: Color = Color::Rgb(219, 97, 162);
+pub const CYBER_PUNK: Color = Color::Rgb(30, 240, 201);
+pub const INFO_BLUE: Color = Color::Rgb(88, 166, 255);
+pub const LAVENDER: Color = Color::Rgb(179, 157, 219);
+pub const MINT: Color = Color::Rgb(163, 230, 181);
