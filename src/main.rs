@@ -295,10 +295,10 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                 if key.kind == KeyEventKind::Press {
                     match key.code {
                         KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
-                        KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => app.next_tab(),
-                        KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
-                        KeyCode::Down | KeyCode::Char('j') => app.next_item(),
-                        KeyCode::Up | KeyCode::Char('k') => app.prev_item(),
+                        KeyCode::Tab | KeyCode::Right => app.next_tab(),
+                        KeyCode::BackTab | KeyCode::Left => app.prev_tab(),
+                        KeyCode::Down => app.next_item(),
+                        KeyCode::Up => app.prev_item(),
                         _ => {}
                     }
                 }
