@@ -4,7 +4,7 @@ use std::time::Duration;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetSize},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     backend::CrosstermBackend,
@@ -89,7 +89,7 @@ impl ItemType {
             "mp4" | "mkv" | "avi" | "mov" | "wmv" | "flv" | "webm" => ItemType::Video,
             "mp3" | "wav" | "flac" | "aac" | "ogg" | "wma" | "m4a" => ItemType::Audio,
             "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" => ItemType::Archive,
-            "rs" | "py" | "js" | "ts" | "java" | "c" | "cpp" | "h" | "go" | "rb" | "php" 
+            "rs" | "py" | "js" | "ts" | "java" | "c" | "cpp" | "h" | "go" | "rb" | "php"
             | "swift" | "kt" | "scala" | "html" | "css" | "json" | "yaml" | "toml" | "xml" | "sh" => ItemType::Code,
             _ => ItemType::Other,
         }
@@ -97,14 +97,14 @@ impl ItemType {
 
     fn label(&self) -> &str {
         match self {
-            ItemType::Folder => "folders",
-            ItemType::Code => "code",
-            ItemType::Document => "docs",
-            ItemType::Image => "images",
-            ItemType::Video => "video",
-            ItemType::Audio => "audio",
-            ItemType::Archive => "archives",
-            ItemType::Other => "other",
+            ItemType::Folder => "Folders",
+            ItemType::Code => "Code",
+            ItemType::Document => "Docs",
+            ItemType::Image => "Images",
+            ItemType::Video => "Video",
+            ItemType::Audio => "Audio",
+            ItemType::Archive => "Archives",
+            ItemType::Other => "Other",
         }
     }
 }
@@ -134,7 +134,7 @@ impl App {
             ItemType::Archive,
             ItemType::Other,
         ];
-        
+
         let mut app = App {
             items,
             filtered_items: Vec::new(),
@@ -154,29 +154,29 @@ impl App {
 
     fn load_trash_items() -> Vec<TrashItem> {
         let mut items = Vec::new();
-        
+
         let home = std::env::var("HOME").unwrap_or_default();
         let trash_path = format!("{}/.Trash", home);
-        
+
         if let Ok(entries) = std::fs::read_dir(&trash_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 let name = path.file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
-                
+
                 if name.starts_with('.') {
                     continue;
                 }
-                
+
                 let is_dir = path.is_dir();
-                
+
                 let ext = path.extension()
                     .map(|e| e.to_string_lossy().to_string())
                     .unwrap_or_default();
-                
+
                 let item_type = ItemType::from_extension(&ext, is_dir);
-                
+
                 let deleted_at = entry.metadata()
                     .and_then(|m| m.modified())
                     .map(|t| {
@@ -184,7 +184,7 @@ impl App {
                         datetime.format("%Y-%m-%d %H:%M").to_string()
                     })
                     .unwrap_or_else(|_| "Unknown".to_string());
-                
+
                 items.push(TrashItem {
                     name,
                     original_path: path.to_string_lossy().to_string(),
@@ -194,7 +194,7 @@ impl App {
                 });
             }
         }
-        
+
         items.sort_by(|a, b| b.deleted_at.cmp(&a.deleted_at));
         items
     }
@@ -266,9 +266,9 @@ impl App {
 fn main() -> io::Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    
+
     execute!(stdout, EnterAlternateScreen)?;
-    
+
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -313,7 +313,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
 
 fn ui(f: &mut Frame, app: &mut App) {
     let area = f.area();
-    
+
     f.render_widget(Block::default().style(Style::default().bg(BG)), area);
 
     let main_layout = Layout::default()
@@ -321,22 +321,24 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(8),
-            Constraint::Length(5),
+            Constraint::Length(3),
+            Constraint::Length(1),
         ])
         .split(area);
 
     render_header(f, app, main_layout[0]);
     render_content(f, app, main_layout[1]);
     render_query(f, main_layout[2]);
+    render_footer(f, main_layout[3]);
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let total_count = app.items.len();
-    
+
     let mut spans = vec![
         Span::styled("  ", Style::default().fg(RED)),
-        Span::styled("trash", Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
-        Span::styled(" │ ", Style::default().fg(BORDER)),
+        Span::styled("Trash", Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+        Span::styled("  ", Style::default()),
     ];
 
     for (i, tab) in app.tabs.iter().enumerate() {
@@ -344,37 +346,48 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         if count == 0 {
             continue;
         }
-        
+
         let is_selected = i == app.selected_tab;
-        
+
         if is_selected {
-            spans.push(Span::styled("▌", Style::default().fg(tab.color())));
+            spans.push(Span::styled(" ", Style::default().bg(SURFACE_BRIGHT)));
+            spans.push(Span::styled(
+                tab.icon(),
+                Style::default().fg(tab.color()).bg(SURFACE_BRIGHT)
+            ));
+            spans.push(Span::styled(
+                tab.label(),
+                Style::default()
+                    .fg(TEXT)
+                    .bg(SURFACE_BRIGHT)
+                    .add_modifier(Modifier::BOLD)
+            ));
+            spans.push(Span::styled(
+                format!(" {}", count),
+                Style::default().fg(tab.color()).bg(SURFACE_BRIGHT)
+            ));
+            spans.push(Span::styled(" ", Style::default().bg(SURFACE_BRIGHT)));
+        } else {
+            spans.push(Span::styled(" ", Style::default()));
+            spans.push(Span::styled(
+                tab.icon(),
+                Style::default().fg(TEXT_DIM)
+            ));
+            spans.push(Span::styled(
+                tab.label(),
+                Style::default().fg(TEXT_DIM)
+            ));
+            spans.push(Span::styled(
+                format!(" {}", count),
+                Style::default().fg(TEXT_DIM)
+            ));
         }
-        
-        spans.push(Span::styled(
-            tab.icon(),
-            Style::default().fg(if is_selected { tab.color() } else { TEXT_DIM })
-        ));
-        spans.push(Span::styled(
-            tab.label(),
-            Style::default()
-                .fg(if is_selected { TEXT } else { TEXT_DIM })
-                .add_modifier(if is_selected { Modifier::BOLD } else { Modifier::empty() })
-        ));
-        spans.push(Span::styled(
-            format!(" {}", count),
-            Style::default().fg(if is_selected { tab.color() } else { TEXT_DIM })
-        ));
-        
-        if is_selected {
-            spans.push(Span::styled("▐", Style::default().fg(tab.color())));
-        }
-        
-        spans.push(Span::styled("  ", Style::default()));
+
+        spans.push(Span::styled(" ", Style::default()));
     }
 
     spans.push(Span::styled(
-        format!("  total {}", total_count),
+        format!(" {} items", total_count),
         Style::default().fg(TEXT_DIM)
     ));
 
@@ -402,13 +415,13 @@ fn render_content(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
     let max_name_len = area.width.saturating_sub(20) as usize;
-    
+
     let items: Vec<ListItem> = app.filtered_items
         .iter()
         .enumerate()
         .map(|(i, item)| {
             let is_selected = app.list_state.selected() == Some(i);
-            
+
             let line = Line::from(vec![
                 Span::styled(
                     if is_selected { " ▸ " } else { "   " },
@@ -422,7 +435,7 @@ fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
                         .add_modifier(if is_selected { Modifier::BOLD } else { Modifier::empty() })
                 ),
             ]);
-            
+
             ListItem::new(line).style(
                 if is_selected {
                     Style::default().bg(SURFACE_BRIGHT)
@@ -460,13 +473,13 @@ fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
         width: 1,
         height: area.height.saturating_sub(2),
     };
-    
+
     f.render_stateful_widget(scrollbar, scrollbar_area, &mut app.scroll_state);
 }
 
 fn render_details(f: &mut Frame, app: &App, area: Rect) {
     let max_path_len = area.width.saturating_sub(10) as usize;
-    
+
     let content = if let Some(selected) = app.list_state.selected() {
         if let Some(item) = app.filtered_items.get(selected) {
             vec![
@@ -527,37 +540,30 @@ fn render_query(f: &mut Frame, area: Rect) {
     };
 
     let query_block = Block::default()
-        .title(Span::styled(" query ", Style::default().fg(GREEN)))
+        .title(Span::styled("  Query ", Style::default().fg(ACCENT)))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(BORDER))
         .style(Style::default().bg(SURFACE));
 
-    let inner = query_block.inner(inner_area);
     f.render_widget(query_block, inner_area);
+}
 
-    let keybinds = Line::from(vec![
-        Span::styled("  ", Style::default().fg(TEXT_DIM)),
-        Span::styled("q", Style::default().fg(RED).add_modifier(Modifier::BOLD)),
-        Span::styled("/", Style::default().fg(BORDER)),
-        Span::styled("esc", Style::default().fg(RED).add_modifier(Modifier::BOLD)),
-        Span::styled(" quit   ", Style::default().fg(TEXT_DIM)),
-        Span::styled("j", Style::default().fg(GREEN).add_modifier(Modifier::BOLD)),
-        Span::styled("/", Style::default().fg(BORDER)),
-        Span::styled("k", Style::default().fg(GREEN).add_modifier(Modifier::BOLD)),
-        Span::styled(" nav   ", Style::default().fg(TEXT_DIM)),
-        Span::styled("h", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD)),
-        Span::styled("/", Style::default().fg(BORDER)),
-        Span::styled("l", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD)),
-        Span::styled("/", Style::default().fg(BORDER)),
-        Span::styled("tab", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD)),
-        Span::styled(" switch", Style::default().fg(TEXT_DIM)),
+fn render_footer(f: &mut Frame, area: Rect) {
+    let footer = Line::from(vec![
+        Span::styled(" ", Style::default()),
+        Span::styled("q", Style::default().fg(ACCENT)),
+        Span::styled(" quit  ", Style::default().fg(TEXT_DIM)),
+        Span::styled("↑↓", Style::default().fg(ACCENT)),
+        Span::styled(" navigate  ", Style::default().fg(TEXT_DIM)),
+        Span::styled("tab or ←→", Style::default().fg(ACCENT)),
+        Span::styled(" switch category", Style::default().fg(TEXT_DIM)),
     ]);
 
-    let help = Paragraph::new(keybinds)
-        .style(Style::default().bg(SURFACE));
+    let footer_widget = Paragraph::new(footer)
+        .style(Style::default().bg(BG));
 
-    f.render_widget(help, inner);
+    f.render_widget(footer_widget, area);
 }
 
 fn empty_state() -> Vec<Line<'static>> {
@@ -575,7 +581,7 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     if max_len == 0 {
         return String::new();
     }
-    
+
     let char_count = s.chars().count();
     if char_count <= max_len {
         s.to_string()
