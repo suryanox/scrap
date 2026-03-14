@@ -1,18 +1,35 @@
 use std::io;
+use std::os::unix::prelude::MetadataExt;
 use std::time::Duration;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, SetSize},
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs},
+    text::{Line, Span},
+    widgets::{Block, Borders, BorderType, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame, Terminal,
 };
+
+const BG: Color = Color::Rgb(13, 17, 23);
+const SURFACE: Color = Color::Rgb(22, 27, 34);
+const SURFACE_BRIGHT: Color = Color::Rgb(33, 38, 45);
+const BORDER: Color = Color::Rgb(48, 54, 61);
+const BORDER_HIGHLIGHT: Color = Color::Rgb(88, 166, 255);
+const TEXT: Color = Color::Rgb(230, 237, 243);
+const TEXT_DIM: Color = Color::Rgb(125, 133, 144);
+const ACCENT: Color = Color::Rgb(88, 166, 255);
+const GREEN: Color = Color::Rgb(63, 185, 80);
+const YELLOW: Color = Color::Rgb(210, 153, 34);
+const RED: Color = Color::Rgb(248, 81, 73);
+const PURPLE: Color = Color::Rgb(163, 113, 247);
+const CYAN: Color = Color::Rgb(57, 211, 211);
+const ORANGE: Color = Color::Rgb(219, 109, 40);
+const PINK: Color = Color::Rgb(219, 97, 162);
 
 #[derive(Debug, Clone)]
 struct TrashItem {
@@ -20,6 +37,7 @@ struct TrashItem {
     original_path: String,
     deleted_at: String,
     item_type: ItemType,
+    size: u64
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,27 +55,27 @@ enum ItemType {
 impl ItemType {
     fn icon(&self) -> &str {
         match self {
-            ItemType::Document => "󰈙 ",
-            ItemType::Image => "󰋩 ",
-            ItemType::Video => "󰕧 ",
-            ItemType::Audio => "󰎆 ",
-            ItemType::Archive => "󰀼 ",
-            ItemType::Code => "󰅩 ",
-            ItemType::Folder => "󰉋 ",
-            ItemType::Other => "󰈔 ",
+            ItemType::Folder => " ",
+            ItemType::Code => " ",
+            ItemType::Document => " ",
+            ItemType::Image => " ",
+            ItemType::Video => " ",
+            ItemType::Audio => " ",
+            ItemType::Archive => " ",
+            ItemType::Other => " ",
         }
     }
 
     fn color(&self) -> Color {
         match self {
-            ItemType::Document => Color::Rgb(137, 180, 250),
-            ItemType::Image => Color::Rgb(249, 226, 175),
-            ItemType::Video => Color::Rgb(203, 166, 247),
-            ItemType::Audio => Color::Rgb(166, 227, 161),
-            ItemType::Code => Color::Rgb(148, 226, 213),
-            ItemType::Archive => Color::Rgb(250, 179, 135),
-            ItemType::Folder => Color::Rgb(180, 190, 254),
-            ItemType::Other => Color::Rgb(166, 173, 200),
+            ItemType::Folder => ACCENT,
+            ItemType::Code => GREEN,
+            ItemType::Document => CYAN,
+            ItemType::Image => YELLOW,
+            ItemType::Video => PURPLE,
+            ItemType::Audio => PINK,
+            ItemType::Archive => ORANGE,
+            ItemType::Other => TEXT_DIM,
         }
     }
 
@@ -72,21 +90,21 @@ impl ItemType {
             "mp3" | "wav" | "flac" | "aac" | "ogg" | "wma" | "m4a" => ItemType::Audio,
             "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" => ItemType::Archive,
             "rs" | "py" | "js" | "ts" | "java" | "c" | "cpp" | "h" | "go" | "rb" | "php" 
-            | "swift" | "kt" | "scala" | "html" | "css" | "json" | "yaml" | "toml" | "xml" => ItemType::Code,
+            | "swift" | "kt" | "scala" | "html" | "css" | "json" | "yaml" | "toml" | "xml" | "sh" => ItemType::Code,
             _ => ItemType::Other,
         }
     }
 
     fn label(&self) -> &str {
         match self {
-            ItemType::Document => "Documents",
-            ItemType::Image => "Images",
-            ItemType::Video => "Videos",
-            ItemType::Audio => "Audio",
-            ItemType::Archive => "Archives",
-            ItemType::Code => "Code",
-            ItemType::Folder => "Folders",
-            ItemType::Other => "Other",
+            ItemType::Folder => "folders",
+            ItemType::Code => "code",
+            ItemType::Document => "docs",
+            ItemType::Image => "images",
+            ItemType::Video => "video",
+            ItemType::Audio => "audio",
+            ItemType::Archive => "archives",
+            ItemType::Other => "other",
         }
     }
 }
@@ -100,6 +118,7 @@ struct App {
     #[allow(dead_code)]
     query: String,
     should_quit: bool,
+    scroll_state: ScrollbarState,
 }
 
 impl App {
@@ -124,6 +143,7 @@ impl App {
             tabs,
             query: String::new(),
             should_quit: false,
+            scroll_state: ScrollbarState::default(),
         };
         app.filter_items();
         if !app.filtered_items.is_empty() {
@@ -170,12 +190,20 @@ impl App {
                     original_path: path.to_string_lossy().to_string(),
                     deleted_at,
                     item_type,
+                    size: entry.metadata().unwrap().size()
                 });
             }
         }
         
         items.sort_by(|a, b| b.deleted_at.cmp(&a.deleted_at));
         items
+    }
+
+    fn get_type_count(&self, item_type: &ItemType) -> usize {
+        self.items
+            .iter()
+            .filter(|item| &item.item_type == item_type)
+            .count()
     }
 
     fn filter_items(&mut self) {
@@ -185,12 +213,14 @@ impl App {
             .filter(|item| &item.item_type == selected_type)
             .cloned()
             .collect();
+        self.scroll_state = self.scroll_state.content_length(self.filtered_items.len());
     }
 
     fn next_tab(&mut self) {
         self.selected_tab = (self.selected_tab + 1) % self.tabs.len();
         self.filter_items();
         self.list_state.select(if self.filtered_items.is_empty() { None } else { Some(0) });
+        self.scroll_state = self.scroll_state.position(0);
     }
 
     fn prev_tab(&mut self) {
@@ -201,6 +231,7 @@ impl App {
         };
         self.filter_items();
         self.list_state.select(if self.filtered_items.is_empty() { None } else { Some(0) });
+        self.scroll_state = self.scroll_state.position(0);
     }
 
     fn next_item(&mut self) {
@@ -209,15 +240,12 @@ impl App {
         }
         let i = match self.list_state.selected() {
             Some(i) => {
-                if i >= self.filtered_items.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
+                if i >= self.filtered_items.len() - 1 { 0 } else { i + 1 }
             }
             None => 0,
         };
         self.list_state.select(Some(i));
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn prev_item(&mut self) {
@@ -226,22 +254,21 @@ impl App {
         }
         let i = match self.list_state.selected() {
             Some(i) => {
-                if i == 0 {
-                    self.filtered_items.len() - 1
-                } else {
-                    i - 1
-                }
+                if i == 0 { self.filtered_items.len() - 1 } else { i - 1 }
             }
             None => 0,
         };
         self.list_state.select(Some(i));
+        self.scroll_state = self.scroll_state.position(i);
     }
 }
 
 fn main() -> io::Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
+    
     execute!(stdout, EnterAlternateScreen)?;
+    
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -259,21 +286,19 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) -> io::Result<()> {
     loop {
-        terminal.draw(|f| ui(f, &mut app)).unwrap();
+        terminal.draw(|f| ui(f, &mut app))?;
 
-        if event::poll(Duration::from_millis(100))? {
+        if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match key.code {
-                        KeyCode::Char('q') => app.should_quit = true,
-                        KeyCode::Tab => app.next_tab(),
-                        KeyCode::BackTab => app.prev_tab(),
+                        KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
+                        KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => app.next_tab(),
+                        KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
                         KeyCode::Down | KeyCode::Char('j') => app.next_item(),
                         KeyCode::Up | KeyCode::Char('k') => app.prev_item(),
-                        KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
-                        KeyCode::Right | KeyCode::Char('l') => app.next_tab(),
                         _ => {}
                     }
                 }
@@ -287,173 +312,298 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
 }
 
 fn ui(f: &mut Frame, app: &mut App) {
-    let bg_color = Color::Rgb(30, 30, 46);
-    let surface_color = Color::Rgb(49, 50, 68);
-    let text_color = Color::Rgb(205, 214, 244);
-    let accent_color = Color::Rgb(137, 180, 250);
-    let border_color = Color::Rgb(88, 91, 112);
-    let dim_text = Color::Rgb(108, 112, 134);
+    let area = f.area();
+    
+    f.render_widget(Block::default().style(Style::default().bg(BG)), area);
 
-    let main_block = Block::default()
-        .style(Style::default().bg(bg_color));
-    f.render_widget(main_block, f.area());
-
-    let chunks = Layout::default()
+    let main_layout = Layout::default()
         .direction(Direction::Vertical)
-        .margin(1)
         .constraints([
             Constraint::Length(3),
-            Constraint::Min(10),
+            Constraint::Min(8),
             Constraint::Length(5),
         ])
-        .split(f.area());
+        .split(area);
 
-    let header_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(12), Constraint::Min(0)])
-        .split(chunks[0]);
+    render_header(f, app, main_layout[0]);
+    render_content(f, app, main_layout[1]);
+    render_query(f, main_layout[2]);
+}
 
-    let title = Paragraph::new(Text::from(vec![
-        Line::from(vec![
-            Span::styled("󰩹 ", Style::default().fg(Color::Rgb(243, 139, 168))),
-            Span::styled("scrap", Style::default().fg(accent_color).bold()),
-        ]),
-    ]))
-    .style(Style::default().bg(bg_color))
-    .block(Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(border_color))
-        .style(Style::default().bg(surface_color)));
-    f.render_widget(title, header_chunks[0]);
+fn render_header(f: &mut Frame, app: &App, area: Rect) {
+    let total_count = app.items.len();
+    
+    let mut spans = vec![
+        Span::styled("  ", Style::default().fg(RED)),
+        Span::styled("trash", Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+        Span::styled(" │ ", Style::default().fg(BORDER)),
+    ];
 
-    let tab_titles: Vec<Line> = app.tabs
-        .iter()
-        .enumerate()
-        .map(|(i, t)| {
-            let count = app.items.iter().filter(|item| &item.item_type == t).count();
-            let style = if i == app.selected_tab {
-                Style::default().fg(t.color()).bold()
-            } else {
-                Style::default().fg(dim_text)
-            };
-            Line::from(vec![
-                Span::styled(t.icon(), style),
-                Span::styled(format!("{} ", t.label()), style),
-                Span::styled(format!("({})", count), Style::default().fg(dim_text)),
-            ])
-        })
-        .collect();
+    for (i, tab) in app.tabs.iter().enumerate() {
+        let count = app.get_type_count(tab);
+        if count == 0 {
+            continue;
+        }
+        
+        let is_selected = i == app.selected_tab;
+        
+        if is_selected {
+            spans.push(Span::styled("▌", Style::default().fg(tab.color())));
+        }
+        
+        spans.push(Span::styled(
+            tab.icon(),
+            Style::default().fg(if is_selected { tab.color() } else { TEXT_DIM })
+        ));
+        spans.push(Span::styled(
+            tab.label(),
+            Style::default()
+                .fg(if is_selected { TEXT } else { TEXT_DIM })
+                .add_modifier(if is_selected { Modifier::BOLD } else { Modifier::empty() })
+        ));
+        spans.push(Span::styled(
+            format!(" {}", count),
+            Style::default().fg(if is_selected { tab.color() } else { TEXT_DIM })
+        ));
+        
+        if is_selected {
+            spans.push(Span::styled("▐", Style::default().fg(tab.color())));
+        }
+        
+        spans.push(Span::styled("  ", Style::default()));
+    }
 
-    let tabs = Tabs::new(tab_titles)
+    spans.push(Span::styled(
+        format!("  total {}", total_count),
+        Style::default().fg(TEXT_DIM)
+    ));
+
+    let header = Paragraph::new(Line::from(spans))
+        .style(Style::default().bg(SURFACE))
+        .alignment(Alignment::Left)
         .block(Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(border_color))
-            .style(Style::default().bg(surface_color)))
-        .highlight_style(Style::default().fg(accent_color))
-        .select(app.selected_tab)
-        .divider(Span::styled(" │ ", Style::default().fg(border_color)));
-    f.render_widget(tabs, header_chunks[1]);
+            .borders(Borders::BOTTOM)
+            .border_type(BorderType::Plain)
+            .border_style(Style::default().fg(BORDER)));
 
-    let content_chunks = Layout::default()
+    f.render_widget(header, area);
+}
+
+fn render_content(f: &mut Frame, app: &mut App, area: Rect) {
+    let content_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-        .split(chunks[1]);
+        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+        .horizontal_margin(1)
+        .split(area);
 
+    render_file_list(f, app, content_layout[0]);
+    render_details(f, app, content_layout[1]);
+}
+
+fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
+    let max_name_len = area.width.saturating_sub(20) as usize;
+    
     let items: Vec<ListItem> = app.filtered_items
         .iter()
         .enumerate()
         .map(|(i, item)| {
             let is_selected = app.list_state.selected() == Some(i);
-            let style = if is_selected {
-                Style::default()
-                    .fg(item.item_type.color())
-                    .bg(Color::Rgb(69, 71, 90))
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(text_color)
-            };
-
-            let content = Line::from(vec![
+            
+            let line = Line::from(vec![
+                Span::styled(
+                    if is_selected { " ▸ " } else { "   " },
+                    Style::default().fg(ACCENT)
+                ),
                 Span::styled(item.item_type.icon(), Style::default().fg(item.item_type.color())),
-                Span::styled(&item.name, style),
+                Span::styled(
+                    truncate_str(&item.name, max_name_len),
+                    Style::default()
+                        .fg(if is_selected { TEXT } else { TEXT_DIM })
+                        .add_modifier(if is_selected { Modifier::BOLD } else { Modifier::empty() })
+                ),
             ]);
-            ListItem::new(content)
+            
+            ListItem::new(line).style(
+                if is_selected {
+                    Style::default().bg(SURFACE_BRIGHT)
+                } else {
+                    Style::default().bg(SURFACE)
+                }
+            )
         })
         .collect();
 
+    let current_tab = &app.tabs[app.selected_tab];
+    let title = format!(" {} ", current_tab.label());
+
     let list = List::new(items)
         .block(Block::default()
-            .title(Span::styled(
-                format!(" {} ({}) ", app.tabs[app.selected_tab].label(), app.filtered_items.len()),
-                Style::default().fg(accent_color).bold()
-            ))
+            .title(Span::styled(title, Style::default().fg(current_tab.color()).add_modifier(Modifier::BOLD)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(border_color))
-            .style(Style::default().bg(surface_color)))
-        .highlight_style(Style::default().bg(Color::Rgb(69, 71, 90)))
-        .highlight_symbol("▸ ");
-    f.render_stateful_widget(list, content_chunks[0], &mut app.list_state);
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(BORDER_HIGHLIGHT))
+            .style(Style::default().bg(SURFACE)));
 
-    let details = if let Some(selected) = app.list_state.selected() {
+    f.render_stateful_widget(list, area, &mut app.list_state);
+
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(None)
+        .end_symbol(None)
+        .track_symbol(Some("│"))
+        .thumb_symbol("┃")
+        .track_style(Style::default().fg(BORDER))
+        .thumb_style(Style::default().fg(ACCENT));
+
+    let scrollbar_area = Rect {
+        x: area.x + area.width - 1,
+        y: area.y + 1,
+        width: 1,
+        height: area.height.saturating_sub(2),
+    };
+    
+    f.render_stateful_widget(scrollbar, scrollbar_area, &mut app.scroll_state);
+}
+
+fn render_details(f: &mut Frame, app: &App, area: Rect) {
+    let max_path_len = area.width.saturating_sub(10) as usize;
+    
+    let content = if let Some(selected) = app.list_state.selected() {
         if let Some(item) = app.filtered_items.get(selected) {
             vec![
+                Line::from(""),
                 Line::from(vec![
-                    Span::styled("Name: ", Style::default().fg(dim_text)),
-                    Span::styled(&item.name, Style::default().fg(text_color)),
+                    Span::styled("   name ", Style::default().fg(TEXT_DIM)),
+                    Span::styled(truncate_str(&item.name, max_path_len), Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
                 ]),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("Type: ", Style::default().fg(dim_text)),
+                    Span::styled("   type ", Style::default().fg(TEXT_DIM)),
+                    Span::styled(item.item_type.icon(), Style::default().fg(item.item_type.color())),
                     Span::styled(item.item_type.label(), Style::default().fg(item.item_type.color())),
                 ]),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("Deleted: ", Style::default().fg(dim_text)),
-                    Span::styled(&item.deleted_at, Style::default().fg(Color::Rgb(245, 194, 231))),
+                    Span::styled("   time ", Style::default().fg(TEXT_DIM)),
+                    Span::styled(&item.deleted_at, Style::default().fg(YELLOW)),
                 ]),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("Path: ", Style::default().fg(dim_text)),
+                    Span::styled("   Size ", Style::default().fg(TEXT_DIM)),
+                    Span::styled(format_bytes(item.size), Style::default().fg(YELLOW)),
                 ]),
+                Line::from(""),
                 Line::from(vec![
-                    Span::styled(&item.original_path, Style::default().fg(dim_text).italic()),
+                    Span::styled("   path ", Style::default().fg(TEXT_DIM)),
+                    Span::styled(
+                        truncate_str(&item.original_path, max_path_len),
+                        Style::default().fg(TEXT_DIM)
+                    ),
                 ]),
             ]
         } else {
-            vec![Line::from(Span::styled("No item selected", Style::default().fg(dim_text)))]
+            empty_state()
         }
     } else {
-        vec![Line::from(Span::styled("No item selected", Style::default().fg(dim_text)))]
+        empty_state()
     };
 
-    let details_widget = Paragraph::new(details)
+    let details = Paragraph::new(content)
         .block(Block::default()
-            .title(Span::styled(" Details ", Style::default().fg(accent_color).bold()))
+            .title(Span::styled(" info ", Style::default().fg(TEXT_DIM)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(border_color))
-            .style(Style::default().bg(surface_color)))
-        .style(Style::default().bg(surface_color));
-    f.render_widget(details_widget, content_chunks[1]);
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(BORDER))
+            .style(Style::default().bg(SURFACE)));
+
+    f.render_widget(details, area);
+}
+
+fn render_query(f: &mut Frame, area: Rect) {
+    let inner_area = Rect {
+        x: area.x + 1,
+        y: area.y,
+        width: area.width.saturating_sub(2),
+        height: area.height,
+    };
 
     let query_block = Block::default()
-        .title(Span::styled(" Query ", Style::default().fg(accent_color).bold()))
+        .title(Span::styled(" query ", Style::default().fg(GREEN)))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(border_color))
-        .style(Style::default().bg(surface_color));
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(BORDER))
+        .style(Style::default().bg(SURFACE));
 
-    let query_inner = query_block.inner(chunks[2]);
-    f.render_widget(query_block, chunks[2]);
+    let inner = query_block.inner(inner_area);
+    f.render_widget(query_block, inner_area);
 
-    let help_text = Line::from(vec![
-        Span::styled("  q", Style::default().fg(Color::Rgb(243, 139, 168)).bold()),
-        Span::styled(" quit  ", Style::default().fg(dim_text)),
-        Span::styled("↑↓/jk", Style::default().fg(Color::Rgb(166, 227, 161)).bold()),
-        Span::styled(" navigate  ", Style::default().fg(dim_text)),
-        Span::styled("←→/hl/Tab", Style::default().fg(Color::Rgb(249, 226, 175)).bold()),
-        Span::styled(" switch tab", Style::default().fg(dim_text)),
+    let keybinds = Line::from(vec![
+        Span::styled("  ", Style::default().fg(TEXT_DIM)),
+        Span::styled("q", Style::default().fg(RED).add_modifier(Modifier::BOLD)),
+        Span::styled("/", Style::default().fg(BORDER)),
+        Span::styled("esc", Style::default().fg(RED).add_modifier(Modifier::BOLD)),
+        Span::styled(" quit   ", Style::default().fg(TEXT_DIM)),
+        Span::styled("j", Style::default().fg(GREEN).add_modifier(Modifier::BOLD)),
+        Span::styled("/", Style::default().fg(BORDER)),
+        Span::styled("k", Style::default().fg(GREEN).add_modifier(Modifier::BOLD)),
+        Span::styled(" nav   ", Style::default().fg(TEXT_DIM)),
+        Span::styled("h", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD)),
+        Span::styled("/", Style::default().fg(BORDER)),
+        Span::styled("l", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD)),
+        Span::styled("/", Style::default().fg(BORDER)),
+        Span::styled("tab", Style::default().fg(YELLOW).add_modifier(Modifier::BOLD)),
+        Span::styled(" switch", Style::default().fg(TEXT_DIM)),
     ]);
 
-    let help_widget = Paragraph::new(help_text)
-        .style(Style::default().bg(surface_color));
-    f.render_widget(help_widget, query_inner);
+    let help = Paragraph::new(keybinds)
+        .style(Style::default().bg(SURFACE));
+
+    f.render_widget(help, inner);
+}
+
+fn empty_state() -> Vec<Line<'static>> {
+    vec![
+        Line::from(""),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("      ", Style::default()),
+            Span::styled("no item selected", Style::default().fg(TEXT_DIM)),
+        ]),
+    ]
+}
+
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if max_len == 0 {
+        return String::new();
+    }
+    
+    let char_count = s.chars().count();
+    if char_count <= max_len {
+        s.to_string()
+    } else if max_len > 3 {
+        let truncated: String = s.chars().take(max_len - 3).collect();
+        format!("{}...", truncated)
+    } else {
+        s.chars().take(max_len).collect()
+    }
+}
+
+fn format_bytes(bytes: u64) -> String {
+    let kb = 1024f64;
+    let mb = kb * 1024.0;
+    let gb = mb * 1024.0;
+    let tb = gb * 1024.0;
+
+    let b = bytes as f64;
+
+    if b >= tb {
+        format!("{:.2}TB", b / tb)
+    } else if b >= gb {
+        format!("{:.2}GB", b / gb)
+    } else if b >= mb {
+        format!("{:.2}MB", b / mb)
+    } else if b >= kb {
+        format!("{:.2}KB", b / kb)
+    } else {
+        format!("{}B", bytes)
+    }
 }
