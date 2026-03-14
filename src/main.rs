@@ -25,11 +25,11 @@ const TEXT_DIM: Color = Color::Rgb(125, 133, 144);
 const ACCENT: Color = Color::Rgb(88, 166, 255);
 const GREEN: Color = Color::Rgb(63, 185, 80);
 const YELLOW: Color = Color::Rgb(210, 153, 34);
-const RED: Color = Color::Rgb(248, 81, 73);
 const PURPLE: Color = Color::Rgb(163, 113, 247);
 const CYAN: Color = Color::Rgb(57, 211, 211);
 const ORANGE: Color = Color::Rgb(219, 109, 40);
 const PINK: Color = Color::Rgb(219, 97, 162);
+const CYBER_PUNK: Color = Color::Rgb(30, 240, 201);
 
 #[derive(Debug, Clone)]
 struct TrashItem {
@@ -55,14 +55,14 @@ enum ItemType {
 impl ItemType {
     fn icon(&self) -> &str {
         match self {
-            ItemType::Folder => " ",
-            ItemType::Code => " ",
-            ItemType::Document => " ",
-            ItemType::Image => " ",
-            ItemType::Video => " ",
-            ItemType::Audio => " ",
-            ItemType::Archive => " ",
-            ItemType::Other => " ",
+            ItemType::Folder   => "󰉋 ",
+            ItemType::Code     => "󰅩 ",
+            ItemType::Document => "󰈙 ",
+            ItemType::Image    => "󰈟 ",
+            ItemType::Video    => "󰈫 ",
+            ItemType::Audio    => "󰈣 ",
+            ItemType::Archive  => "󰿺 ",
+            ItemType::Other    => "󰈚 ",
         }
     }
 
@@ -336,8 +336,9 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let total_count = app.items.len();
 
     let mut spans = vec![
-        Span::styled("  ", Style::default().fg(RED)),
-        Span::styled("Trash", Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+        Span::styled("  ", Style::default().fg(CYBER_PUNK)),
+        Span::styled("󰩹 ", Style::default().fg(CYBER_PUNK)),
+        Span::styled("Scrap", Style::default().fg(CYBER_PUNK).add_modifier(Modifier::BOLD)),
         Span::styled("  ", Style::default()),
     ];
 
