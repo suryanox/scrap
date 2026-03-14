@@ -31,6 +31,12 @@ const ORANGE: Color = Color::Rgb(219, 109, 40);
 const PINK: Color = Color::Rgb(219, 97, 162);
 const CYBER_PUNK: Color = Color::Rgb(30, 240, 201);
 
+const INFO_BLUE: Color = Color::Rgb(88, 166, 255);
+const AMBER: Color = Color::Rgb(255, 191, 0);
+const LAVENDER: Color = Color::Rgb(179, 157, 219);
+
+const MINT: Color = Color::Rgb(163, 230, 181);
+
 #[derive(Debug, Clone)]
 struct TrashItem {
     name: String,
@@ -486,27 +492,27 @@ fn render_details(f: &mut Frame, app: &App, area: Rect) {
             vec![
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("   Name: ", Style::default().fg(TEXT_DIM)),
-                    Span::styled(truncate_str(&item.name, max_path_len), Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+                    Span::styled("   Name: ", Style::default().fg(MINT)),
+                    Span::styled(truncate_str(&item.name, max_path_len), Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD)),
                 ]),
                 Line::from(vec![
-                    Span::styled("   Type: ", Style::default().fg(TEXT_DIM)),
+                    Span::styled("   Type: ", Style::default().fg(MINT)),
                     Span::styled(item.item_type.icon(), Style::default().fg(item.item_type.color())),
                     Span::styled(item.item_type.label(), Style::default().fg(item.item_type.color())),
                 ]),
                 Line::from(vec![
-                    Span::styled("   Date Modified: ", Style::default().fg(TEXT_DIM)),
-                    Span::styled(&item.deleted_at, Style::default().fg(YELLOW)),
+                    Span::styled("   Date Modified: ", Style::default().fg(MINT)),
+                    Span::styled(&item.deleted_at, Style::default().fg(LAVENDER)),
                 ]),
                 Line::from(vec![
-                    Span::styled("   Size: ", Style::default().fg(TEXT_DIM)),
-                    Span::styled(format_bytes(item.size), Style::default().fg(YELLOW)),
+                    Span::styled("   Size: ", Style::default().fg(MINT)),
+                    Span::styled(format_bytes(item.size), Style::default().fg(LAVENDER)),
                 ]),
                 Line::from(vec![
-                    Span::styled("   Path: ", Style::default().fg(TEXT_DIM)),
+                    Span::styled("   Path: ", Style::default().fg(MINT)),
                     Span::styled(
                         truncate_str(&item.original_path, max_path_len),
-                        Style::default().fg(TEXT_DIM)
+                        Style::default().fg(LAVENDER)
                     ),
                 ]),
             ]
@@ -519,7 +525,7 @@ fn render_details(f: &mut Frame, app: &App, area: Rect) {
 
     let details = Paragraph::new(content)
         .block(Block::default()
-            .title(Span::styled(" info ", Style::default().fg(TEXT_DIM)))
+            .title(Span::styled("󰋽 Info ", Style::default().fg(INFO_BLUE)))
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(BORDER))
