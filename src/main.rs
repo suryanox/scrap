@@ -319,9 +319,9 @@ fn ui(f: &mut Frame, app: &mut App) {
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Min(8),
-            Constraint::Length(3),
+            Constraint::Length(2),
+            Constraint::Min(7),
+            Constraint::Length(4),
             Constraint::Length(1),
         ])
         .split(area);
@@ -479,35 +479,31 @@ fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_details(f: &mut Frame, app: &App, area: Rect) {
-    let max_path_len = area.width.saturating_sub(10) as usize;
+    let max_path_len = area.width.saturating_sub(5) as usize;
 
     let content = if let Some(selected) = app.list_state.selected() {
         if let Some(item) = app.filtered_items.get(selected) {
             vec![
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("   name ", Style::default().fg(TEXT_DIM)),
+                    Span::styled("   Name: ", Style::default().fg(TEXT_DIM)),
                     Span::styled(truncate_str(&item.name, max_path_len), Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
                 ]),
-                Line::from(""),
                 Line::from(vec![
-                    Span::styled("   type ", Style::default().fg(TEXT_DIM)),
+                    Span::styled("   Type: ", Style::default().fg(TEXT_DIM)),
                     Span::styled(item.item_type.icon(), Style::default().fg(item.item_type.color())),
                     Span::styled(item.item_type.label(), Style::default().fg(item.item_type.color())),
                 ]),
-                Line::from(""),
                 Line::from(vec![
-                    Span::styled("   time ", Style::default().fg(TEXT_DIM)),
+                    Span::styled("   Date Modified: ", Style::default().fg(TEXT_DIM)),
                     Span::styled(&item.deleted_at, Style::default().fg(YELLOW)),
                 ]),
-                Line::from(""),
                 Line::from(vec![
-                    Span::styled("   Size ", Style::default().fg(TEXT_DIM)),
+                    Span::styled("   Size: ", Style::default().fg(TEXT_DIM)),
                     Span::styled(format_bytes(item.size), Style::default().fg(YELLOW)),
                 ]),
-                Line::from(""),
                 Line::from(vec![
-                    Span::styled("   path ", Style::default().fg(TEXT_DIM)),
+                    Span::styled("   Path: ", Style::default().fg(TEXT_DIM)),
                     Span::styled(
                         truncate_str(&item.original_path, max_path_len),
                         Style::default().fg(TEXT_DIM)
