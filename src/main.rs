@@ -1,3 +1,5 @@
+mod color;
+
 use std::io;
 use std::os::unix::prelude::MetadataExt;
 use std::time::Duration;
@@ -14,28 +16,7 @@ use ratatui::{
     widgets::{Block, Borders, BorderType, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame, Terminal,
 };
-
-const BG: Color = Color::Rgb(13, 17, 23);
-const SURFACE: Color = Color::Rgb(22, 27, 34);
-const SURFACE_BRIGHT: Color = Color::Rgb(33, 38, 45);
-const BORDER: Color = Color::Rgb(48, 54, 61);
-const BORDER_HIGHLIGHT: Color = Color::Rgb(88, 166, 255);
-const TEXT: Color = Color::Rgb(230, 237, 243);
-const TEXT_DIM: Color = Color::Rgb(125, 133, 144);
-const ACCENT: Color = Color::Rgb(88, 166, 255);
-const GREEN: Color = Color::Rgb(63, 185, 80);
-const YELLOW: Color = Color::Rgb(210, 153, 34);
-const PURPLE: Color = Color::Rgb(163, 113, 247);
-const CYAN: Color = Color::Rgb(57, 211, 211);
-const ORANGE: Color = Color::Rgb(219, 109, 40);
-const PINK: Color = Color::Rgb(219, 97, 162);
-const CYBER_PUNK: Color = Color::Rgb(30, 240, 201);
-
-const INFO_BLUE: Color = Color::Rgb(88, 166, 255);
-const AMBER: Color = Color::Rgb(255, 191, 0);
-const LAVENDER: Color = Color::Rgb(179, 157, 219);
-
-const MINT: Color = Color::Rgb(163, 230, 181);
+use crate::color::{ACCENT, BG, BORDER, BORDER_HIGHLIGHT, CYAN, CYBER_PUNK, GREEN, INFO_BLUE, LAVENDER, MINT, ORANGE, PINK, PURPLE, SURFACE, SURFACE_BRIGHT, TEXT, TEXT_DIM, YELLOW};
 
 #[derive(Debug, Clone)]
 struct TrashItem {
