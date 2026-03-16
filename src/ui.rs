@@ -27,7 +27,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
-    let total_count = app.items.len();
+    let total_count = app.current_items_count();
 
     let mut spans = vec![
         Span::styled("  ", Style::default().fg(CYBER_PUNK)),
@@ -37,7 +37,7 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     ];
 
     for (i, tab) in app.tabs.iter().enumerate() {
-        let count = app.get_type_count(tab);
+        let count = app.scrap_yard.get_type_count(tab);
         if count == 0 {
             continue;
         }
@@ -111,8 +111,8 @@ fn render_content(f: &mut Frame, app: &mut App, area: Rect) {
 fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
     let max_name_len = area.width.saturating_sub(20) as usize;
 
-    let items: Vec<ListItem> = app.filtered_items
-        .iter()
+    let items: Vec<ListItem> = app.scrap_yard
+        .iter_items(app.current_item_type())
         .enumerate()
         .map(|(i, item)| {
             let is_selected = app.list_state.selected() == Some(i);
@@ -175,38 +175,34 @@ fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
 fn render_details(f: &mut Frame, app: &App, area: Rect) {
     let max_path_len = area.width.saturating_sub(5) as usize;
 
-    let content = if let Some(selected) = app.list_state.selected() {
-        if let Some(item) = app.filtered_items.get(selected) {
-            vec![
-                Line::from(""),
-                Line::from(vec![
-                    Span::styled("   Name: ", Style::default().fg(MINT)),
-                    Span::styled(truncate_str(&item.name, max_path_len), Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD)),
-                ]),
-                Line::from(vec![
-                    Span::styled("   Type: ", Style::default().fg(MINT)),
-                    Span::styled(item.item_type.icon(), Style::default().fg(item.item_type.color())),
-                    Span::styled(item.item_type.label(), Style::default().fg(item.item_type.color())),
-                ]),
-                Line::from(vec![
-                    Span::styled("   Date Modified: ", Style::default().fg(MINT)),
-                    Span::styled(&item.deleted_at, Style::default().fg(LAVENDER)),
-                ]),
-                Line::from(vec![
-                    Span::styled("   Size: ", Style::default().fg(MINT)),
-                    Span::styled(format_bytes(item.size), Style::default().fg(LAVENDER)),
-                ]),
-                Line::from(vec![
-                    Span::styled("   Path: ", Style::default().fg(MINT)),
-                    Span::styled(
-                        truncate_str(&item.original_path, max_path_len),
-                        Style::default().fg(LAVENDER)
-                    ),
-                ]),
-            ]
-        } else {
-            empty_state()
-        }
+    let content = if let Some(item) = app.get_selected_item() {
+        vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("   Name: ", Style::default().fg(MINT)),
+                Span::styled(truncate_str(&item.name, max_path_len), Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(vec![
+                Span::styled("   Type: ", Style::default().fg(MINT)),
+                Span::styled(item.item_type.icon(), Style::default().fg(item.item_type.color())),
+                Span::styled(item.item_type.label(), Style::default().fg(item.item_type.color())),
+            ]),
+            Line::from(vec![
+                Span::styled("   Date Modified: ", Style::default().fg(MINT)),
+                Span::styled(&item.deleted_at, Style::default().fg(LAVENDER)),
+            ]),
+            Line::from(vec![
+                Span::styled("   Size: ", Style::default().fg(MINT)),
+                Span::styled(format_bytes(item.size), Style::default().fg(LAVENDER)),
+            ]),
+            Line::from(vec![
+                Span::styled("   Path: ", Style::default().fg(MINT)),
+                Span::styled(
+                    truncate_str(&item.original_path, max_path_len),
+                    Style::default().fg(LAVENDER)
+                ),
+            ]),
+        ]
     } else {
         empty_state()
     };

@@ -2,6 +2,7 @@ use ratatui::prelude::Color;
 use crate::color::{ACCENT, CYAN, GREEN, ORANGE, PINK, PURPLE, TEXT_DIM, YELLOW};
 
 #[derive(Debug, Clone, PartialEq)]
+#[derive(Eq, Hash)]
 pub enum ItemType {
     Document,
     Image,

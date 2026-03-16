@@ -3,6 +3,8 @@ mod trash;
 mod item;
 mod app;
 mod ui;
+mod scrap_yard;
+mod scrap;
 
 use crate::item::ItemType;
 use crossterm::{
