@@ -1,7 +1,7 @@
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Line, Modifier, Span, Style};
-use ratatui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation};
+use ratatui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, Wrap};
 use crate::app::App;
 use crate::color::{ACCENT, BG, BORDER, BORDER_HIGHLIGHT, CYBER_PUNK, INFO_BLUE, LAVENDER, MINT, SURFACE, SURFACE_BRIGHT, TEXT, TEXT_DIM};
 
@@ -100,7 +100,7 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
 fn render_content(f: &mut Frame, app: &mut App, area: Rect) {
     let content_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+        .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
         .horizontal_margin(1)
         .split(area);
 
@@ -109,8 +109,6 @@ fn render_content(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
-    let max_name_len = area.width.saturating_sub(20) as usize;
-
     let items: Vec<ListItem> = app.scrap_yard
         .iter_items(app.current_item_type())
         .enumerate()
@@ -123,8 +121,7 @@ fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
                     Style::default().fg(ACCENT)
                 ),
                 Span::styled(item.item_type.icon(), Style::default().fg(item.item_type.color())),
-                Span::styled(
-                    truncate_str(&item.name, max_name_len),
+                Span::styled(&item.name,
                     Style::default()
                         .fg(if is_selected { TEXT } else { TEXT_DIM })
                         .add_modifier(if is_selected { Modifier::BOLD } else { Modifier::empty() })
@@ -173,14 +170,12 @@ fn render_file_list(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_details(f: &mut Frame, app: &App, area: Rect) {
-    let max_path_len = area.width.saturating_sub(5) as usize;
-
     let content = if let Some(item) = app.get_selected_item() {
         vec![
             Line::from(""),
             Line::from(vec![
                 Span::styled("   Name: ", Style::default().fg(MINT)),
-                Span::styled(truncate_str(&item.name, max_path_len), Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD)),
+                Span::styled(&item.name, Style::default().fg(LAVENDER).add_modifier(Modifier::BOLD)),
             ]),
             Line::from(vec![
                 Span::styled("   Type: ", Style::default().fg(MINT)),
@@ -198,7 +193,7 @@ fn render_details(f: &mut Frame, app: &App, area: Rect) {
             Line::from(vec![
                 Span::styled("   Path: ", Style::default().fg(MINT)),
                 Span::styled(
-                    truncate_str(&item.original_path, max_path_len),
+                    &item.original_path,
                     Style::default().fg(LAVENDER)
                 ),
             ]),
@@ -207,7 +202,7 @@ fn render_details(f: &mut Frame, app: &App, area: Rect) {
         empty_state()
     };
 
-    let details = Paragraph::new(content)
+    let details = Paragraph::new(content).wrap(Wrap { trim: false })
         .block(Block::default()
             .title(Span::styled("󰋽 Info ", Style::default().fg(INFO_BLUE)))
             .borders(Borders::ALL)
@@ -262,22 +257,6 @@ fn empty_state() -> Vec<Line<'static>> {
             Span::styled("No item selected", Style::default().fg(TEXT_DIM)),
         ]),
     ]
-}
-
-fn truncate_str(s: &str, max_len: usize) -> String {
-    if max_len == 0 {
-        return String::new();
-    }
-
-    let char_count = s.chars().count();
-    if char_count <= max_len {
-        s.to_string()
-    } else if max_len > 3 {
-        let truncated: String = s.chars().take(max_len - 3).collect();
-        format!("{}...", truncated)
-    } else {
-        s.chars().take(max_len).collect()
-    }
 }
 
 fn format_bytes(bytes: u64) -> String {
