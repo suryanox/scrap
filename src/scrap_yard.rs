@@ -4,7 +4,8 @@ use crate::item::ItemType;
 use crate::scrap::Scrap;
 use crate::trash::TrashItem;
 pub struct ScrapYard {
-    junk: HashMap<ItemType, Scrap>
+    junk: HashMap<ItemType, Scrap>,
+    size: u64
 }
 
 impl ScrapYard {
@@ -37,7 +38,7 @@ impl ScrapYard {
 
 
     pub fn build() -> ScrapYard {
-        let mut scrapy =  ScrapYard { junk: HashMap::new() };
+        let mut scrapy =  ScrapYard { junk: HashMap::new(), size: 0 };
         let home = std::env::var("HOME").unwrap_or_default();
         let trash_path = format!("{}/.Trash", home);
 
@@ -68,15 +69,22 @@ impl ScrapYard {
                     })
                     .unwrap_or_else(|_| "Unknown".to_string());
 
+                let size_of_item = entry.metadata().unwrap().size();
                 scrapy.add_junk(TrashItem {
                     name,
                     original_path: path.to_string_lossy().to_string(),
                     deleted_at,
                     item_type,
-                    size: entry.metadata().unwrap().size()
+                    size: size_of_item
                 });
+
+                scrapy.size += size_of_item
             }
         }
         scrapy
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
     }
 }

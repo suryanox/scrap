@@ -27,12 +27,13 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
-    let total_count = app.current_items_count();
-
     let mut spans = vec![
         Span::styled("  ", Style::default().fg(CYBER_PUNK)),
         Span::styled("󰩹 ", Style::default().fg(CYBER_PUNK)),
         Span::styled("Scrap", Style::default().fg(CYBER_PUNK).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" {} ", format_bytes(app.scrap_yard.size())),
+            Style::default().fg(CYBER_PUNK).add_modifier(Modifier::BOLD),
+        ),
         Span::styled("  ", Style::default()),
     ];
 
@@ -80,11 +81,6 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
 
         spans.push(Span::styled(" ", Style::default()));
     }
-
-    spans.push(Span::styled(
-        format!(" {} items", total_count),
-        Style::default().fg(TEXT_DIM)
-    ));
 
     let header = Paragraph::new(Line::from(spans))
         .style(Style::default().bg(SURFACE))
