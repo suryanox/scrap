@@ -257,7 +257,7 @@ fn render_query(f: &mut Frame, app: &App, area: Rect) {
     ];
 
     let hint = if app.query.is_empty() && is_query_mode {
-        " delete all | delete <type>"
+        " Type query here, delete all | delete <type>"
     } else {
         ""
     };
