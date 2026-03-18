@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czvf scrap-${{ matrix.target }}.tar.gz scrap
+          shasum -a 256 scrap-${{ matrix.target }}.tar.gz > scrap-${{ matrix.target }}.tar.gz.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrap-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/scrap-${{ matrix.target }}.tar.gz
+            target/${{ matrix.target }}/release/scrap-${{ matrix.target }}.tar.gz.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "version=$(grep '^version' Cargo.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: |
+            scrap-x86_64-apple-darwin/scrap-x86_64-apple-darwin.tar.gz
+            scrap-x86_64-apple-darwin/scrap-x86_64-apple-darwin.tar.gz.sha256
+            scrap-aarch64-apple-darwin/scrap-aarch64-apple-darwin.tar.gz
+            scrap-aarch64-apple-darwin/scrap-aarch64-apple-darwin.tar.gz.sha256
