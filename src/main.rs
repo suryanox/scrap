@@ -6,7 +6,6 @@ mod ui;
 mod scrap_yard;
 mod scrap;
 
-use crate::item::ItemType;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
@@ -15,7 +14,7 @@ use crossterm::{
 use ratatui::{ backend::CrosstermBackend, Terminal };
 use std::io;
 use std::time::Duration;
-use crate::app::App;
+use crate::app::{App, InputMode};
 use crate::ui::ui;
 
 fn main() -> io::Result<()> {
@@ -48,13 +47,27 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
-                        KeyCode::Tab | KeyCode::Right => app.next_tab(),
-                        KeyCode::BackTab | KeyCode::Left => app.prev_tab(),
-                        KeyCode::Down => app.next_item(),
-                        KeyCode::Up => app.prev_item(),
-                        _ => {}
+                    match app.input_mode {
+                        InputMode::Query => match key.code {
+                            KeyCode::Esc => app.exit_query_mode(),
+                            KeyCode::Enter => {
+                                if app.is_query_valid() {
+                                    app.run_query();
+                                }
+                            }
+                            KeyCode::Backspace => app.query_pop(),
+                            KeyCode::Char(c) => app.query_push(c),
+                            _ => {}
+                        },
+                        InputMode::Normal => match key.code {
+                            KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
+                            KeyCode::Char('/') => app.enter_query_mode(),
+                            KeyCode::Tab | KeyCode::Right => app.next_tab(),
+                            KeyCode::BackTab | KeyCode::Left => app.prev_tab(),
+                            KeyCode::Down => app.next_item(),
+                            KeyCode::Up => app.prev_item(),
+                            _ => {}
+                        },
                     }
                 }
             }

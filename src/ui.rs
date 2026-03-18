@@ -2,8 +2,8 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Line, Modifier, Span, Style};
 use ratatui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, Wrap};
-use crate::app::App;
-use crate::color::{ACCENT, BG, BORDER, BORDER_HIGHLIGHT, CYBER_PUNK, INFO_BLUE, LAVENDER, MINT, SURFACE, SURFACE_BRIGHT, TEXT, TEXT_DIM};
+use crate::app::{App, InputMode, QueryCommand};
+use crate::color::{ACCENT, BG, BORDER, BORDER_HIGHLIGHT, CYBER_PUNK, GREEN, INFO_BLUE, LAVENDER, MINT, ORANGE, SURFACE, SURFACE_BRIGHT, TEXT, TEXT_DIM};
 
 pub fn ui(f: &mut Frame, app: &mut App) {
     let area = f.area();
@@ -22,8 +22,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
     render_header(f, app, main_layout[0]);
     render_content(f, app, main_layout[1]);
-    render_query(f, main_layout[2]);
-    render_footer(f, main_layout[3]);
+    render_query(f, app, main_layout[2]);
+    render_footer(f, app, main_layout[3]);
 }
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
@@ -209,7 +209,7 @@ fn render_details(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(details, area);
 }
 
-fn render_query(f: &mut Frame, area: Rect) {
+fn render_query(f: &mut Frame, app: &App, area: Rect) {
     let inner_area = Rect {
         x: area.x + 1,
         y: area.y,
@@ -217,26 +217,104 @@ fn render_query(f: &mut Frame, area: Rect) {
         height: area.height,
     };
 
+    let is_query_mode = app.input_mode == InputMode::Query;
+    let border_color = if is_query_mode { BORDER_HIGHLIGHT } else { BORDER };
+
     let query_block = Block::default()
         .title(Span::styled("  Query ", Style::default().fg(ACCENT)))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(BORDER))
+        .border_style(Style::default().fg(border_color))
         .style(Style::default().bg(SURFACE));
 
     f.render_widget(query_block, inner_area);
+
+    let content_area = Rect {
+        x: inner_area.x + 2,
+        y: inner_area.y + 1,
+        width: inner_area.width.saturating_sub(4),
+        height: inner_area.height.saturating_sub(2),
+    };
+
+    let query_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(20), Constraint::Length(12)])
+        .split(content_area);
+
+    let (status_icon, status_color) = match &app.query_command {
+        QueryCommand::Empty => ("", TEXT_DIM),
+        QueryCommand::DeleteAll => ("󰄬 ", GREEN),
+        QueryCommand::DeleteByType(_) => ("󰄬 ", GREEN),
+        QueryCommand::Invalid => ("󰅙 ", ORANGE),
+    };
+
+    let cursor = if is_query_mode { "▎" } else { "" };
+    
+    let input_spans = vec![
+        Span::styled(status_icon, Style::default().fg(status_color)),
+        Span::styled(&app.query, Style::default().fg(TEXT)),
+        Span::styled(cursor, Style::default().fg(ACCENT)),
+    ];
+
+    let hint = if app.query.is_empty() && is_query_mode {
+        " delete all | delete <type>"
+    } else {
+        ""
+    };
+
+    let input_line = if app.query.is_empty() && is_query_mode {
+        Line::from(vec![
+            Span::styled(hint, Style::default().fg(TEXT_DIM)),
+            Span::styled(cursor, Style::default().fg(ACCENT)),
+        ])
+    } else {
+        Line::from(input_spans)
+    };
+
+    let input = Paragraph::new(input_line);
+    f.render_widget(input, query_layout[0]);
+
+    let run_button = if app.is_query_valid() {
+        Line::from(vec![
+            Span::styled(" ", Style::default().bg(GREEN)),
+            Span::styled(" Run ", Style::default().fg(BG).bg(GREEN).add_modifier(Modifier::BOLD)),
+            Span::styled("↵", Style::default().fg(BG).bg(GREEN)),
+            Span::styled(" ", Style::default().bg(GREEN)),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled(" ", Style::default().bg(SURFACE_BRIGHT)),
+            Span::styled(" Run ", Style::default().fg(TEXT_DIM).bg(SURFACE_BRIGHT)),
+            Span::styled("↵", Style::default().fg(TEXT_DIM).bg(SURFACE_BRIGHT)),
+            Span::styled(" ", Style::default().bg(SURFACE_BRIGHT)),
+        ])
+    };
+
+    let button = Paragraph::new(run_button).alignment(Alignment::Right);
+    f.render_widget(button, query_layout[1]);
 }
 
-fn render_footer(f: &mut Frame, area: Rect) {
-    let footer = Line::from(vec![
-        Span::styled(" ", Style::default()),
-        Span::styled("q", Style::default().fg(ACCENT)),
-        Span::styled(" quit  ", Style::default().fg(TEXT_DIM)),
-        Span::styled("↑↓", Style::default().fg(ACCENT)),
-        Span::styled(" navigate  ", Style::default().fg(TEXT_DIM)),
-        Span::styled("tab or ←→", Style::default().fg(ACCENT)),
-        Span::styled(" switch category", Style::default().fg(TEXT_DIM)),
-    ]);
+fn render_footer(f: &mut Frame, app: &App, area: Rect) {
+    let footer = match app.input_mode {
+        InputMode::Query => Line::from(vec![
+            Span::styled(" ", Style::default()),
+            Span::styled("esc", Style::default().fg(ACCENT)),
+            Span::styled(" cancel  ", Style::default().fg(TEXT_DIM)),
+            Span::styled("enter", Style::default().fg(ACCENT)),
+            Span::styled(" run query", Style::default().fg(TEXT_DIM)),
+        ]),
+        InputMode::Normal => Line::from(vec![
+            Span::styled(" ", Style::default()),
+            Span::styled("q", Style::default().fg(ACCENT)),
+            Span::styled(" quit  ", Style::default().fg(TEXT_DIM)),
+            Span::styled("↑↓", Style::default().fg(ACCENT)),
+            Span::styled(" navigate  ", Style::default().fg(TEXT_DIM)),
+            Span::styled("tab or ←→", Style::default().fg(ACCENT)),
+            Span::styled(" switch category  ", Style::default().fg(TEXT_DIM)),
+            Span::styled("/", Style::default().fg(ACCENT)),
+            Span::styled(" query", Style::default().fg(TEXT_DIM)),
+        ]),
+    };
 
     let footer_widget = Paragraph::new(footer)
         .style(Style::default().bg(BG));

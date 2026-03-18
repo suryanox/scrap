@@ -1,4 +1,4 @@
-use crate::ItemType;
+use crate::item::ItemType;
 
 #[derive(Debug, Clone)]
 pub struct TrashItem {

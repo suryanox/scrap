@@ -87,4 +87,25 @@ impl ScrapYard {
     pub fn size(&self) -> u64 {
         self.size
     }
+
+    pub fn delete_all(&mut self) {
+        for scrap in self.junk.values() {
+            for item in scrap.items.values() {
+                let _ = std::fs::remove_file(&item.original_path)
+                    .or_else(|_| std::fs::remove_dir_all(&item.original_path));
+            }
+        }
+        self.junk.clear();
+        self.size = 0;
+    }
+
+    pub fn delete_by_type(&mut self, item_type: &ItemType) {
+        if let Some(scrap) = self.junk.remove(item_type) {
+            for item in scrap.items.values() {
+                self.size = self.size.saturating_sub(item.size);
+                let _ = std::fs::remove_file(&item.original_path)
+                    .or_else(|_| std::fs::remove_dir_all(&item.original_path));
+            }
+        }
+    }
 }
