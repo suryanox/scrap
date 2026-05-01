@@ -3,6 +3,16 @@ use std::os::unix::fs::MetadataExt;
 use crate::item::ItemType;
 use crate::scrap::Scrap;
 use crate::trash::TrashItem;
+
+pub fn check_trash_access() -> bool {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let trash_path = format!("{}/.Trash", home);
+    match std::fs::read_dir(&trash_path) {
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => false,
+        _ => true,
+    }
+}
+
 pub struct ScrapYard {
     junk: HashMap<ItemType, Scrap>,
     size: u64
