@@ -16,8 +16,20 @@ use std::io;
 use std::time::Duration;
 use crate::app::{App, InputMode};
 use crate::ui::ui;
+use crate::scrap_yard::check_trash_access;
 
 fn main() -> io::Result<()> {
+    if !check_trash_access() {
+        eprintln!("scrap: no permission to access Trash.");
+        eprintln!("Grant Full Disk Access to your terminal in:");
+        eprintln!("  System Settings > Privacy & Security > Full Disk Access");
+        eprintln!("Opening System Settings now...");
+        let _ = std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles")
+            .spawn();
+        std::process::exit(1);
+    }
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
 
